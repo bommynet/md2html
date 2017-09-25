@@ -1,0 +1,6 @@
+# don't stage node modules
+/node_modules/
+
+# don't stage in and out folder content
+/in/*
+/out/*
