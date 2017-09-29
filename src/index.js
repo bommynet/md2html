@@ -63,13 +63,12 @@ function Converter_Md2Html(dir_md, dir_html, relativeToScript = true) {
 
     /**
      * Checks if markdown-html pair is deprecated.
-     * @param {string} file_md markdown file
-     * @param {string} file_html html file
+     * @param {string} file_object
      */
-    const isHtmlDeprecated = function(file_md, file_html) {
+    const isHtmlDeprecated = function(file_object) {
         // check if files existing
-        const exists_md = fs.existsSync(file_md)
-        const exists_html = fs.existsSync(file_html)
+        const exists_md = fs.existsSync(file_object.md)
+        const exists_html = fs.existsSync(file_object.html)
 
         // check special conditions
         // 1. no md-file -> no conversion
@@ -78,8 +77,8 @@ function Converter_Md2Html(dir_md, dir_html, relativeToScript = true) {
         if(exists_md && !exists_html) return true
 
         // get file modified times
-        const modified_md = fs.statSync(file_md).ctime
-        const modified_html = fs.statSync(file_html).ctime
+        const modified_md = fs.statSync(file_object.md).ctime
+        const modified_html = fs.statSync(file_object.html).ctime
 
         if(modified_md > modified_html)
             return true
@@ -87,15 +86,19 @@ function Converter_Md2Html(dir_md, dir_html, relativeToScript = true) {
             return false
     }
 
-    const execRemarkable = function(file_md, file_html) {
+    /**
+     * Converts markdown file to html file.
+     * @param {object} file_object 
+     */
+    const execRemarkable = function(file_object) {
 
         // read raw md data
-        let rawtext = fs.readFileSync(file_md)
+        const rawtext = fs.readFileSync(file_object.md)
 
         // write to .html
-        fs.writeFileSync(file_html, md.render(rawtext.toString()))
+        fs.writeFileSync(file_object.html, md.render(rawtext.toString()))
 
-        console.log('   converted:', file_md, '=>', file_html)
+        console.log('   converted:', file_object.md, '=>', file_object.html)
     }
 
 
@@ -106,7 +109,7 @@ function Converter_Md2Html(dir_md, dir_html, relativeToScript = true) {
         const files = fs.readdirSync(DIR_IN)
             .map(file => createFilenames(file))
             .filter(obj => fs.existsSync(obj.md)) // really usefull?
-            .forEach(file => execRemarkable(file.md, file.html))
+            .forEach(file => execRemarkable(file))
     }
     
     /**
@@ -120,8 +123,8 @@ function Converter_Md2Html(dir_md, dir_html, relativeToScript = true) {
         const files = fs.readdirSync(DIR_IN)
             .map(file => createFilenames(file))
             .filter(obj => fs.existsSync(obj.md)) // really usefull?
-            .filter(obj => isHtmlDeprecated(obj.md, obj.html))
-            .forEach(file => execRemarkable(file.md, file.html))
+            .filter(obj => isHtmlDeprecated(obj))
+            .forEach(file => execRemarkable(file))
 
         console.log('...done.\n')
     }
@@ -140,7 +143,7 @@ function Converter_Md2Html(dir_md, dir_html, relativeToScript = true) {
         }
 
         // execute conversion
-        execRemarkable(file.md, file.html)
+        execRemarkable(file)
     }
 
     /**
@@ -158,7 +161,7 @@ function Converter_Md2Html(dir_md, dir_html, relativeToScript = true) {
             const file = createFilenames(filename)
 
             if(fs.existsSync(file.md))
-                execRemarkable(file.md, file.html)
+                execRemarkable(file)
         })
     }
 }
@@ -166,4 +169,5 @@ function Converter_Md2Html(dir_md, dir_html, relativeToScript = true) {
 
 
 const conv = new Converter_Md2Html('../in', '../out')
+conv.convertDeprecatedFiles()
 conv.watch()
