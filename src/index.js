@@ -1,44 +1,71 @@
-const fs = require('fs')
-const Remarkable = require('remarkable')
-const md = new Remarkable({
-    html: true,
-    xhtmlOut: true,
-    breaks: false,
-    langPrefix: 'language-',
-    linkify: false,
-    typographer:  false,
-    quotes: '„“‘’',
-    highlight: () => ''
-})
-
-
+/**
+ * Converter modul - markdown to hmtl.
+ * @module md2html
+ */
 function Converter_Md2Html(dir_md, dir_html, relativeToScript = true) {
+    // requires file system and converter
+    const fs = require('fs')
+    const Remarkable = require('remarkable')
+    const md = new Remarkable({
+        html: true,
+        xhtmlOut: true,
+        breaks: false,
+        langPrefix: 'language-',
+        linkify: false,
+        typographer:  false,
+        quotes: '„“‘’',
+        highlight: () => ''
+    })
 
-    const DIR_IN = (relativeToScript ? __dirname : '') + (dir_md.endsWith('/') ? dir_md : dir_md + '/')
-    const DIR_OUT = (relativeToScript ? __dirname : '') + (dir_html.endsWith('/') ? dir_html : dir_html + '/')
+    // system specific path separator
+    const path_sep = require('path').sep
+    
+    /**
+     * Function to help creating correct path names.
+     * @param path {string} path to folder
+     */
+    const createPath = function(path) {
+        // be sure path ends with '/' - e.g. 'path/'
+        path = path.endsWith('/')   ? path : path + path_sep
 
+        // make absolute path from relative input
+        if(relativeToScript) {
+            path = path.startsWith('/') ? path : path_sep + path
+            path = __dirname + path
+        }
+
+        return path
+    }
+
+    // creating correct paths
+    const DIR_IN = createPath(dir_md)
+    const DIR_OUT = createPath(dir_html)
+
+    /**
+     * Create an internal filename-object.
+     * @param {string} filename 
+     * @returns {object} filename-object with elements 'md' and 'html'
+     */
     const createFilenames = function(filename) {
         // filename has to be a string
         if(!filename || typeof filename !== 'string') return null;
 
         // remove extension
-        filename = filename.substr(0, filename.lastIndexOf('.'))
+        if(filename.lastIndexOf('.') >= 0)
+            filename = filename.substr(0, filename.lastIndexOf('.'))
 
+        // create and return filename-obejct
         return {
             md: DIR_IN + filename + '.md',
             html: DIR_OUT + filename + '.html'
         }
     }
 
-    const getAllFiles = function(dirIn = DIR_IN, dirOut = DIR_OUT) {
-
-        // read IN dir
-        let files_in = fs.readdirSync(dirIn)
-        
-        // create file name objects
-        return files_in.map(file => createFilenames(file))
-    }
-
+    /**
+     * Checks if markdown-html pair is deprecated.
+     * @param {string} file_md markdown file
+     * @param {string} file_html html file
+     */
     const isHtmlDeprecated = function(file_md, file_html) {
         // check if files existing
         const exists_md = fs.existsSync(file_md)
@@ -51,8 +78,8 @@ function Converter_Md2Html(dir_md, dir_html, relativeToScript = true) {
         if(exists_md && !exists_html) return true
 
         // get file modified times
-        let modified_md = fs.statSync(file_md).ctime
-        let modified_html = fs.statSync(file_html).ctime
+        const modified_md = fs.statSync(file_md).ctime
+        const modified_html = fs.statSync(file_html).ctime
 
         if(modified_md > modified_html)
             return true
@@ -71,42 +98,56 @@ function Converter_Md2Html(dir_md, dir_html, relativeToScript = true) {
         console.log('   converted:', file_md, '=>', file_html)
     }
 
+
+    /**
+     * Convert all md-files to html.
+     */
     this.convertAllFiles = function() {
-        let files = getAllFiles()
-            .filter(obj => fs.existsSync(obj.md))
-    
-        // iterate over files and convert them to html
-        files.forEach(file => {
-            execRemarkable(file.md, file.html)
-        })
+        const files = fs.readdirSync(DIR_IN)
+            .map(file => createFilenames(file))
+            .filter(obj => fs.existsSync(obj.md)) // really usefull?
+            .forEach(file => execRemarkable(file.md, file.html))
     }
     
+    /**
+     * Convert all deprecated file-pairs to html.
+     * Checks if markdown was updated or html doesn't exist and
+     * converts md to html if needed.
+     */
     this.convertDeprecatedFiles = function() {
         console.log('Checking for deprecated files...')
 
-        let files = getAllFiles()
-            .filter(obj => fs.existsSync(obj.md))
+        const files = fs.readdirSync(DIR_IN)
+            .map(file => createFilenames(file))
+            .filter(obj => fs.existsSync(obj.md)) // really usefull?
             .filter(obj => isHtmlDeprecated(obj.md, obj.html))
-    
-        // iterate over files and convert them to html
-        files.forEach(file => {
-            execRemarkable(file.md, file.html)
-        })
+            .forEach(file => execRemarkable(file.md, file.html))
 
         console.log('...done.\n')
     }
 
+    /**
+     * Convert a single markdown file to html.
+     * @param filename {string} markdown file existing in 'DIR_IN' to convert to html
+     */
     this.convertFile = function(filename) {
-        let file = createFilenames(filename)
+        const file = createFilenames(filename)
 
+        // check if file is valid
         if(!fs.existsSync(file.md)) {
             console.log('No valid file:', file.md)
             return
         }
 
+        // execute conversion
         execRemarkable(file.md, file.html)
     }
 
+    /**
+     * Start a converter deamon.
+     * Monitors files in 'DIR_IN' and converts modified markdown files.
+     * @param precheck {boolean} if true, it will be checked for deprecated files on start
+     */
     this.watch = function(precheck = true) {
         if(precheck)
             this.convertDeprecatedFiles()
@@ -114,7 +155,7 @@ function Converter_Md2Html(dir_md, dir_html, relativeToScript = true) {
         console.log('Start watching folder:', DIR_IN)
 
         fs.watch(DIR_IN, {encoding: 'utf-8'}, (eventType, filename) => {
-            let file = createFilenames(filename)
+            const file = createFilenames(filename)
 
             if(fs.existsSync(file.md))
                 execRemarkable(file.md, file.html)
@@ -124,5 +165,5 @@ function Converter_Md2Html(dir_md, dir_html, relativeToScript = true) {
 
 
 
-const conv = new Converter_Md2Html('/../in', '/../out')
+const conv = new Converter_Md2Html('../in', '../out')
 conv.watch()
