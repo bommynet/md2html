@@ -1,8 +1,6 @@
-/**
- * Converter modul - markdown to hmtl.
- * @module md2html
- */
-function Converter_Md2Html(dir_md, dir_html, relativeToScript = true) {
+
+
+const Converter_Md2Html = function(dir_md, dir_html, relativeToScript = true) {
     // requires file system and converter
     const fs = require('fs')
     const Remarkable = require('remarkable')
@@ -167,7 +165,4 @@ function Converter_Md2Html(dir_md, dir_html, relativeToScript = true) {
 }
 
 
-
-const conv = new Converter_Md2Html('../in', '../out')
-conv.convertDeprecatedFiles()
-conv.watch()
+module.exports = Converter_Md2Html
